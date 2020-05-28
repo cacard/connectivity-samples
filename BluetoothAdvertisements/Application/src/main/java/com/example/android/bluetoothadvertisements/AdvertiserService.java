@@ -1,6 +1,8 @@
 package com.example.android.bluetoothadvertisements;
 
 import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
@@ -11,8 +13,11 @@ import android.bluetooth.le.AdvertiseSettings;
 import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
+import android.support.annotation.RequiresApi;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -27,7 +32,7 @@ public class AdvertiserService extends Service {
 
     private static final String TAG = AdvertiserService.class.getSimpleName();
 
-    private static final int FOREGROUND_NOTIFICATION_ID = 1;
+    private static final int FOREGROUND_NOTIFICATION_ID = 1111;
 
     /**
      * A global variable to let AdvertiserFragment check if the Service is running without needing
@@ -38,7 +43,7 @@ public class AdvertiserService extends Service {
     public static boolean running = false;
 
     public static final String ADVERTISING_FAILED =
-        "com.example.android.bluetoothadvertisements.advertising_failed";
+            "com.example.android.bluetoothadvertisements.advertising_failed";
 
     public static final String ADVERTISING_FAILED_EXTRA_CODE = "failureCode";
 
@@ -113,12 +118,12 @@ public class AdvertiserService extends Service {
      * Starts a delayed Runnable that will cause the BLE Advertising to timeout and stop after a
      * set amount of time.
      */
-    private void setTimeout(){
+    private void setTimeout() {
         mHandler = new Handler();
         timeoutRunnable = new Runnable() {
             @Override
             public void run() {
-                Log.d(TAG, "AdvertiserService has reached timeout of "+TIMEOUT+" milliseconds, stopping advertising.");
+                Log.d(TAG, "AdvertiserService has reached timeout of " + TIMEOUT + " milliseconds, stopping advertising.");
                 sendFailureIntent(ADVERTISING_TIMED_OUT);
                 stopSelf();
             }
@@ -141,28 +146,40 @@ public class AdvertiserService extends Service {
 
             if (mBluetoothLeAdvertiser != null) {
                 mBluetoothLeAdvertiser.startAdvertising(settings, data,
-                    mAdvertiseCallback);
+                        mAdvertiseCallback);
             }
         }
     }
 
     /**
      * Move service to the foreground, to avoid execution limits on background processes.
-     *
+     * <p>
      * Callers should call stopForeground(true) when background work is complete.
      */
+    @RequiresApi(api = Build.VERSION_CODES.O)
     private void goForeground() {
-        Intent notificationIntent = new Intent(this, MainActivity.class);
+        Intent notificationIntent = new Intent(this, MainActivity2.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
-            notificationIntent, 0);
-        Notification n = new Notification.Builder(this)
-            .setContentTitle("Advertising device via Bluetooth")
-            .setContentText("This device is discoverable to others nearby.")
-            .setSmallIcon(R.drawable.ic_launcher)
-            .setContentIntent(pendingIntent)
-            .build();
+                notificationIntent, 0);
+
+        String NOTIFICATION_CHANNEL_ID = "com.example.simpleapp";
+        String channelName = "My Background Service";
+        NotificationChannel chan = new NotificationChannel(NOTIFICATION_CHANNEL_ID, channelName, NotificationManager.IMPORTANCE_NONE);
+        chan.setLightColor(Color.BLUE);
+        chan.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        assert manager != null;
+        manager.createNotificationChannel(chan);
+
+        Notification n = new Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
+                .setContentTitle("Advertising device via Bluetooth")
+                .setContentText("This device is discoverable to others nearby.")
+                .setSmallIcon(R.drawable.ic_launcher)
+                .setContentIntent(pendingIntent)
+                .build();
         startForeground(FOREGROUND_NOTIFICATION_ID, n);
     }
+
 
     /**
      * Stops BLE Advertising.
@@ -238,7 +255,7 @@ public class AdvertiserService extends Service {
      * Builds and sends a broadcast intent indicating Advertising has failed. Includes the error
      * code as an extra. This is intended to be picked up by the {@code AdvertiserFragment}.
      */
-    private void sendFailureIntent(int errorCode){
+    private void sendFailureIntent(int errorCode) {
         Intent failureIntent = new Intent();
         failureIntent.setAction(ADVERTISING_FAILED);
         failureIntent.putExtra(ADVERTISING_FAILED_EXTRA_CODE, errorCode);
